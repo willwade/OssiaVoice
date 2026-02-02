@@ -32,6 +32,39 @@ export const useMessageStore = defineStore('messages', () => {
     }
 
     async getResponse(messages, wordLoading = false, sentenceLoading = false) {
+      //
+      //
+      // // Create a text generation pipeline
+      // const initProgressCallback = (initProgress) => {
+      //   console.log(initProgress);
+      // }
+      // // Allocate pipeline
+      // // this.engine = await pipeline('text-generation', 'HuggingFaceTB/SmolLM2-1.7B-Instruct');
+      // let generator = await pipeline(
+      //   "text-generation",
+      //   "onnx-community/gemma-3-1b-it-ONNX-GQA",
+      //   {
+      //     dtype: "q8",
+      //     device: "webgpu",
+      //     progress_callback: initProgressCallback,
+      //   },
+      // );
+      // // Define the list of messages
+      // messages = [
+      //   {role: "system", content: "You are a helpful assistant."},
+      //   {role: "user", content: "Tell me a joke."},
+      // ];
+      //
+      // // Generate a response
+      // const output = await generator(messages, {
+      //   num_beams: 5,
+      //   return_dict_in_generate: true
+      // });
+      // console.log(output);
+      //
+      // return;
+
+
       if (!this.checkDependencies(this.additionalDependencies)) return
       if (wordLoading) loadingStore.newWordsLoading++
       if (sentenceLoading) loadingStore.newSentenceLoading++
@@ -89,7 +122,7 @@ export const useMessageStore = defineStore('messages', () => {
     constructor() {
       super();
       this.engine = null;
-      this.engineLoading  = false;
+      this.engineLoading = false;
     }
 
     async setup() {
@@ -97,22 +130,28 @@ export const useMessageStore = defineStore('messages', () => {
         console.log(initProgress);
         if (initProgress.text.includes('Loading model from cache')) {
           let progress = /\[(\d+\/\d+)]/.exec(initProgress.text)[1].split("/")
-          progress = (progress[0] /progress[1]) * 100
+          progress = (progress[0] / progress[1]) * 100
           loadingStore.additionalLoadingBars['WebLLMBar'] = {
             message: `loading model from cache - ${Math.round(progress)}%`,
             value: progress
           }
-        }
-        else {
+        } else {
           loadingStore.additionalLoadingBars['WebLLMBar'] = {
             message: `downloading offline model (only happens once) - ${Math.round(initProgress.progress * 100)}%`,
             value: initProgress.progress * 100
           }
         }
       }
-      const selectedModel = "Hermes-3-Llama-3.2-3B-q4f32_1-MLC";
-      // const selectedModel = "Llama-3.2-3B-Instruct-q4f16_1-MLC";
+      // const selectedModel = "Qwen3-8B-q4f16_1-MLC";
+      // const selectedModel = "DeepSeek-R1-Distill-Qwen-7B-q4f16_1-MLC";
+      // const selectedModel = "DeepSeek-R1-Distill-Llama-8B-q4f16_1-MLC";
       // const selectedModel = "Llama-3.1-8B-Instruct-q4f32_1-MLC";
+      const selectedModel = "Qwen3-4B-q4f16_1-MLC";
+      // const selectedModel = "Hermes-3-Llama-3.2-3B-q4f32_1-MLC";
+      // const selectedModel = "Llama-3.2-3B-Instruct-q4f16_1-MLC";
+      // const selectedModel = "Qwen3-1.7B-q4f16_1-MLC";
+      // const selectedModel = "Llama-3.2-1B-Instruct-q0f16-MLC";
+      // const selectedModel = "Qwen3-0.6B-q4f16_1-MLC";
 
       this.engine = await CreateMLCEngine(
         selectedModel,
@@ -132,15 +171,32 @@ export const useMessageStore = defineStore('messages', () => {
           this.engineLoading = true;
           try {
             await this.setup()
-          }
-          finally {
+          } finally {
             this.engineLoading = false;
           }
         }
         console.log(messages)
-        const completion = await this.engine.chat.completions.create({
+        let response_format = {
+          type: "json_object",
+          schema: {
+            type: 'object',
+            required: ['explanation', 'suggestions'],
+            properties: {
+              explanation: {"type": "string"},
+              suggestions: {"type": "array", "items": {"type": "string"}}
+            }}
+        }
+        response_format = JSON.stringify(response_format)
+        const request = {
           messages,
-        });
+          response_format,
+          extra_body: {
+            enable_thinking: false,
+          },
+        };
+
+        const completion = await this.engine.chat.completions.create(request);
+
         console.log(completion);
         return JSON.parse(completion.choices[0].message.content.replace(/(^[^[]+|[^\]]+$)/g, ''))
 
@@ -154,7 +210,7 @@ export const useMessageStore = defineStore('messages', () => {
     constructor() {
       super();
       this.engine = null;
-      this.engineLoading  = false;
+      this.engineLoading = false;
     }
 
     async setup() {
@@ -163,7 +219,7 @@ export const useMessageStore = defineStore('messages', () => {
       }
       // Allocate pipeline
       // this.engine = await pipeline('text-generation', 'HuggingFaceTB/SmolLM2-1.7B-Instruct');
-      this.engine = await pipeline("text-generation", "onnx-community/Llama-3.2-1B-Instruct", {
+      this.engine = await pipeline("text-generation", "onnx-community/gemma-3-1b-it-ONNX", {
         device: "webgpu",
         dtype: "q8", // auto, fp32, fp16, q8, int8, uint8, q4, bnb4, q4f16
         progress_callback: initProgressCallback,
@@ -180,8 +236,7 @@ export const useMessageStore = defineStore('messages', () => {
           try {
             console.debug("Setting up enginez")
             await this.setup()
-          }
-          finally {
+          } finally {
             this.engineLoading = false;
           }
         }
@@ -201,25 +256,25 @@ export const useMessageStore = defineStore('messages', () => {
   // Respond
   async function generateSentences() {
     const command = `Given the Current Conversation History, generate a list of 3 to 5 short generic sentences the 
-      assistant may want to say. You must respond only with a valid JSON list of suggestions and NOTHING else.`
+      assistant may want to say and an explanation for the options. You must respond only with a valid JSON list of suggestions and NOTHING else.`
     let messages = [
       {role: "system", content: getSentenceSystemMessage()},
-      {role: "user", content: command}
+      {role: "user", content: getMessageHistory() + command + getRules()}
     ]
     sentenceSuggestions.value = await chatCompletionModel.getResponse(messages, false, true) || sentenceSuggestions.value
     activeEditHistory.value = activeEditHistory.value.concat([
       {role: "system", content: command},
-      {role: "assistant", content: `{"suggestions": ["${sentenceSuggestions.value.join('", "')}"]}`}
+      {role: "assistant", content: `["${sentenceSuggestions.value.join('", "')}"]`}
     ])
   }
 
   async function generateWords() {
     const command = `Given the Current Conversation History, generate a short list of key words or 
-    very short phrases the user can select from to build a new sentence. You must respond only with a valid JSON list 
+    very short phrases the user can select from to build a new sentence and an explanation for the options. You must respond only with a valid JSON list 
     of suggestions and NOTHING else.`
     let messages = [
       {role: "system", content: getKeywordSystemMessage()},
-      {role: "user", content: command}
+      {role: "user", content: getMessageHistory() +  command + getRules()}
     ]
     wordSuggestions.value = await chatCompletionModel.getResponse(messages, true, false) || wordSuggestions.value
   }
@@ -361,22 +416,48 @@ export const useMessageStore = defineStore('messages', () => {
     ])
   }
 
-  function getKeywordSystemMessage() {
-    let systemMessage = `
-You are an AI Bot designed to assist someone living with Motor Neurone Disease (MND) (hereafter referred to as the 'user'). 
-You will receive a Current Conversation History between the user and another person (the 'interlocutor'). 
-Your role is to generate **key words and phrases** that may be relevant to the user's next sentence.'.  
+  function getMessageHistory() {
+        let message = `
+**Current Conversation History**
+\`\`\`json
+${JSON.stringify(messageHistory.value)}
+\`\`\`
+`
 
-**The user’s backstory is**:
+    if (activeEditHistory.value.length !== 0) {
+      message += `
+**Edit History**
+\`\`\`json
+${JSON.stringify(activeEditHistory.value)}
+\`\`\`
+`
+    }
+    return message
+  }
 
-${settingStore.backstory}
-
+  function getRules() {
+    return `
 **Rules for Suggestions**:  
 Follow these rules when creating suggestions:
 
 1. Include a variety of options reflecting different moods, opinions and perspectives.
 2. Tailor suggestions based on the assistant's personality, backstory, and current context, but avoid assuming details not provided.
 3. Keep suggestions concise, manageable, likely and useful for communication.
+4. Always return suggestions that directly refer to the conversation history, NOT the backstory. The backstory should be only be used for additional context.
+5. The explanation section MUST be very short (200 words max) but CANNOT be empty. DO NOT repeat yourself in this section.
+`
+  }
+
+  function getKeywordSystemMessage() {
+    let systemMessage = `
+You are an AI Bot designed to assist someone living with Motor Neurone Disease (MND) (hereafter referred to as the 'user'). 
+You will receive a Current Conversation History between the user and another person (the 'interlocutor'). 
+Your role is to generate **key words and phrases** that may be relevant to the user's next sentence. Always refer to the
+**Rules for Suggestions** when responding.
+
+**The user’s backstory is**:
+
+${settingStore.backstory}
 
 **Examples**:
 
@@ -384,23 +465,66 @@ Follow these rules when creating suggestions:
 *User:* "Hello, glad you're home"  
 *assistant:* "Yeah good to be back"
 *User:* "Did you have a good day at work?"  
-*User:* "Prompt: Generate 10-15 key words for a response."  
+*User:* "Given the Current Conversation History, generate a short list of key words or 
+    very short phrases the user can select from to build a new sentence."  
 
 **Output Example**  
 \`\`\`json
-[
-  "not",
-  "good",
-  "stressful",
-  "fun",
-  "tired",
-  "colleagues",
-  "deadline",
-  "meeting",
-  "boring",
-  "day off"
-]
+{
+  "explanation": "I need to cover a broad range of emotions relating to jobs e.g. boring, great, stressful, as well as topics like boss, deadlines etc., and then maybe relevant things from the backstory like words relating to the actual industry",
+  "suggestions": [
+    "boring",
+    "good",
+    "stressful",
+    "fun",
+    "tired",
+    "colleagues",
+    "boss",
+    "deadline",
+    "meeting",
+    "powerpoint",
+    "sales",
+    "targets",
+  ]
+}
 \`\`\`
+
+**Input Example**  
+*User:* "What have you been up to today?"  
+*assistant:* "Just been reading my book"
+*User:* "Oh which book is that?"  
+*User:* "Given the Current Conversation History, generate a short list of key words or 
+    very short phrases the user can select from to build a new sentence."  
+
+**Output Example**  
+\`\`\`json
+{
+  "explanation": "I am unlikely to be able to guess the exact book or author given the lack of context, so I will generate words relating to popular genres and emotions likely to reflect how the user is finding the book",
+  "suggestions": [
+    "sci-fi",
+    "romance",
+    "action",
+    "thriller",
+    "fantasy",
+    "adventure",
+    "horror",
+    "mystery",
+    "detective",
+    "drama",
+    "comedy",
+    "gripping",
+    "heartwarming",
+    "heartbreaking",
+    "funny",
+    "sad",
+    "happy",
+    "exciting",
+    "scary",
+    "slow"
+  ]
+}
+\`\`\`
+
 `
     let now = new Date();
     systemMessage += `Here is some background context to the users current situation. You do not necessarily 
@@ -410,25 +534,6 @@ need to use it:\nDate and Time: ${now}\n`
       systemMessage += `${settingStore.context}\n`
     }
 
-    systemMessage += `
-**Current Conversation History**
-\`\`\`json
-${JSON.stringify(messageHistory.value)}
-\`\`\`
-`
-
-    if (activeEditHistory.value.length !== 0) {
-      systemMessage += `
-**Edit History**
-\`\`\`json
-${JSON.stringify(activeEditHistory.value)}
-\`\`\`
-`
-    }
-
-    systemMessage += `
-The next message you receive will be the instruction for generating suggestions.
-`
     return systemMessage
   }
 
@@ -436,7 +541,8 @@ The next message you receive will be the instruction for generating suggestions.
     let systemMessage = `
 You are an AI Bot designed to assist someone living with Motor Neurone Disease (MND) (hereafter referred to as the 'user'). 
 You will receive a Current Conversation History between the user and another person (the 'interlocutor'). 
-Your role is to generate **short example sentences** that the user may want to use to respond.'.  
+Your role is to generate **short example sentences** that the user may want to use to respond. Always refer to the
+**Rules for Suggestions** when responding.
 
 **The user’s backstory is**:
 
@@ -448,6 +554,8 @@ Follow these rules when creating suggestions:
 1. Include a variety of options reflecting different moods, opinions and perspectives.
 2. Tailor suggestions based on the assistant's personality, backstory, and current context, but avoid assuming details not provided.
 3. Keep suggestions concise, manageable, likely and useful for communication.
+4. Always return suggestions that directly refer to the conversation history, NOT the backstory. The backstory should be only be used for additional context.
+5. The explanation section should be very short. 100 words max. DO NOT repeat yourself in this section.
 
 **Examples**:
 
@@ -459,11 +567,14 @@ Follow these rules when creating suggestions:
 
 **Output Example**
 \`\`\`json
-[
-  "No I'm okay thanks",
-  "Oh go on then, a beer would be great thanks",
-  "Well, maybe a glass of water?"
-]
+{
+  "explanation": "I need to cover a range of drinks, as well as the option to say no or maybe go home",
+  "suggestions": [
+    "Oh go on then, a beer would be great thanks",
+    "Well, maybe a glass of water?"
+    "No I'm okay thanks",
+    "No thanks I should head home soon"]
+}
 \`\`\`
 
 -----
@@ -478,11 +589,16 @@ Keep them generic but use all the words:
 
 **Output Example**
 \`\`\`json
-[
-  "No not yet, would you recommend watching it?",
-  "Yes it was great, I'd really recommend watching it!",
-  "Yes. It wasn't that good, wouldn't really recommend watching it",
-]
+{
+  "explanation": "I should cover a range of opinions on the movie, as well as the case that the user hasn't seen it yet",
+  "suggestions": [
+    "Yes it was great, I'd really recommend watching it!",
+    "Yes. It wasn't that good, wouldn't really recommend watching it",
+    "No not yet, would you recommend watching it?",
+  ]
+}
+
+**The next message you get will be the real conversation - do not use any of the examples above as real output**
 \`\`\`
 `
     let now = new Date();
@@ -493,25 +609,6 @@ need to use it:\nDate and Time: ${now}\n`
       systemMessage += `${settingStore.context}\n`
     }
 
-    systemMessage += `
-**Current Conversation History**
-\`\`\`json
-${JSON.stringify(messageHistory.value)}
-\`\`\`
-`
-
-    if (activeEditHistory.value.length !== 0) {
-      systemMessage += `
-**Edit History**
-\`\`\`json
-${JSON.stringify(activeEditHistory.value)}
-\`\`\`
-`
-    }
-
-    systemMessage += `
-The next message you receive will be the instruction for generating suggestions.
-`
     return systemMessage
   }
 
