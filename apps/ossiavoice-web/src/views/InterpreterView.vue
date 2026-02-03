@@ -6,10 +6,71 @@ import MessageOptions from "@/components/InterpreterView/MessageOptions.vue";
 import SettingsOverlay from "@/components/InterpreterView/SettingsOverlay.vue";
 import {useLoadingStore} from "@/stores/LoadingStore.js";
 import {useSettingsStore} from "@/stores/SettingsStore.js";
+import {usePartnerStore} from "@/stores/PartnerStore.js";
+import {useMessageStore} from "@/stores/MessageStore.js";
 import ErrorHandling from "@/components/reusable/AlertHandling.vue";
+import {onMounted, watch} from "vue";
 
 const loadingStore = useLoadingStore()
 const settingStore = useSettingsStore()
+const partnerStore = usePartnerStore()
+const messageStore = useMessageStore()
+
+function handlePartnerMessage(payload) {
+  if (!payload?.type) return
+  if (payload.deviceId) {
+    partnerStore.recordDevice({
+      deviceId: payload.deviceId,
+      participantId: payload.participantId,
+      displayName: payload.displayName
+    })
+  }
+
+  if (payload.type === 'transcript_chunk') {
+    partnerStore.setLiveDraft(payload.participantId, payload.text)
+    return
+  }
+
+  if (payload.type === 'final_transcript') {
+    partnerStore.setLiveDraft(payload.participantId, '')
+    const name = partnerStore.getDisplayName(payload.participantId)
+    messageStore.messageHistory.push({
+      role: 'user',
+      content: `${name}: ${payload.text}`
+    })
+    messageStore.generateWords()
+    messageStore.generateSentences()
+    return
+  }
+
+  if (payload.type === 'participant_update') {
+    partnerStore.upsertParticipant(payload.participantId, {
+      displayName: payload.displayName,
+      role: payload.role,
+      labels: payload.labels
+    })
+  }
+
+  if (payload.type === 'context_update') {
+    partnerStore.updateParticipantContext(payload.participantId, {
+      relationships: payload.relationships,
+      notes: payload.notes
+    })
+  }
+}
+
+onMounted(() => {
+  if (partnerStore.sessionId) {
+    partnerStore.connect(handlePartnerMessage)
+  }
+})
+
+watch(
+  () => partnerStore.sessionId,
+  (value) => {
+    if (value) partnerStore.connect(handlePartnerMessage)
+  }
+)
 </script>
 
 <template>

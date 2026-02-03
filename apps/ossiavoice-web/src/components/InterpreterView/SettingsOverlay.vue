@@ -1,8 +1,12 @@
 <script setup>
 import {useSettingsStore} from "@/stores/SettingsStore.js";
+import {usePartnerStore} from "@/stores/PartnerStore.js";
+import PartnerPairing from "@/components/InterpreterView/PartnerPairing.vue";
+import PartnerContext from "@/components/InterpreterView/PartnerContext.vue";
 import {onMounted, ref} from "vue";
 
 const settingsStore = useSettingsStore()
+const partnerStore = usePartnerStore()
 
 const emit = defineEmits(['close'])
 const showOpenAIKey = ref(false)
@@ -17,6 +21,10 @@ onMounted(() => {
   isChrome.value = !!window.chrome
   isDesktop.value = screen.width > 1000
   console.log("ischromedesktop", isChrome.value, isDesktop.value)
+
+  partnerStore.ensureOwner()
+    .then(() => partnerStore.connect())
+    .catch((error) => console.warn('Partner setup failed', error))
 })
 
 </script>
@@ -102,6 +110,13 @@ onMounted(() => {
           <v-checkbox v-model="settingsStore.cookieAgreement" label="We use cookies and local storage purely to aid your experience; by
          saving your settings and data locally to your device, we have no need to collect any personal data
          ourselves. By ticking this box I accept the use of cookies and local storage."/>
+        </div>
+        <h2 class="title">Partner Devices</h2>
+        <div class="group-content">
+          <PartnerPairing/>
+        </div>
+        <div class="group-content">
+          <PartnerContext/>
         </div>
         <h2 class="title">Contact & About</h2>
         <div class="group-content">
