@@ -13,6 +13,17 @@ const participantName = ref('')
 const sttAvailable = ref(false)
 const isListening = ref(false)
 const contextNotes = ref('')
+const contextLabel = ref('')
+const contextHistory = ref([])
+const imageItems = ref([])
+const isCaptioning = ref(false)
+const captionError = ref('')
+const gpsStatus = ref('')
+const gpsError = ref('')
+const bleSupported = ref(false)
+const bleDevices = ref([])
+const quickLabels = ['Living room', 'Bedroom', 'Kitchen', 'Garden']
+const accuracyThreshold = Number(import.meta.env.VITE_GPS_ACCURACY_METERS || 50)
 
 const storedPairing = localStorage.getItem('partnerPairing')
 const storedDevice = localStorage.getItem('partnerDevice')
@@ -234,16 +245,235 @@ function sendManual() {
   manualText.value = ''
 }
 
-function sendContextUpdate() {
+function timeMeta() {
+  const now = new Date()
+  const hour = now.getHours()
+  const timeOfDay =
+    hour < 6 ? 'night' : hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : hour < 21 ? 'evening' : 'night'
+  return {
+    localTime: now.toISOString(),
+    date: now.toLocaleDateString(),
+    weekday: now.toLocaleDateString(undefined, { weekday: 'long' }),
+    timeOfDay,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+  }
+}
+
+function pushHistory(entry) {
+  const next = [entry, ...contextHistory.value].slice(0, 5)
+  contextHistory.value = next
+  localStorage.setItem('contextHistory', JSON.stringify(next))
+}
+
+function sendContextUpdate(extra = {}) {
+  const meta = timeMeta()
+  const context = {
+    label: contextLabel.value || undefined,
+    notes: contextNotes.value || undefined,
+    ...extra,
+    ...meta
+  }
   sendMessage({
     type: 'context_update',
-    notes: contextNotes.value
+    context
   })
+  pushHistory(context)
   contextNotes.value = ''
+}
+
+function resendContext(entry) {
+  sendMessage({
+    type: 'context_update',
+    context: entry
+  })
+}
+
+function sendQuickLabel(label) {
+  contextLabel.value = label
+  sendContextUpdate({ source: 'manual' })
+}
+
+function sendGpsContext() {
+  if (!navigator.geolocation) {
+    gpsError.value = 'GPS not supported'
+    return
+  }
+  gpsStatus.value = 'Locating…'
+  gpsError.value = ''
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const { latitude, longitude, accuracy } = pos.coords
+      gpsStatus.value = `Accuracy ~${Math.round(accuracy)}m`
+      const context = {
+        source: 'gps',
+        coords: { lat: latitude, lon: longitude, accuracy }
+      }
+      if (accuracy <= accuracyThreshold) {
+        sendContextUpdate(context)
+      } else {
+        sendContextUpdate({ ...context, warning: 'low_accuracy' })
+      }
+    },
+    (err) => {
+      gpsError.value = err.message || 'GPS failed'
+      gpsStatus.value = ''
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  )
+}
+
+async function addBleDevice(label) {
+  if (!navigator.bluetooth) return
+  const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true })
+  const entry = { id: device.id, name: device.name || 'Unknown', label }
+  const next = [entry, ...bleDevices.value.filter((d) => d.id !== device.id)].slice(0, 10)
+  bleDevices.value = next
+  localStorage.setItem('bleDevices', JSON.stringify(next))
+}
+
+function sendBleContext(device) {
+  sendContextUpdate({ source: 'ble', label: device.label, beaconName: device.name })
+}
+
+async function getCaption(file) {
+  const apiKey = import.meta.env.VITE_OPENAI_API_KEY
+  if (!apiKey) {
+    throw new Error('Missing VITE_OPENAI_API_KEY')
+  }
+  const base64 = await fileToBase64(file)
+  const response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: 'gpt-4.1-mini',
+      input: [
+        {
+          role: 'user',
+          content: [
+            { type: 'input_text', text: 'Describe this image in 1-2 sentences.' },
+            { type: 'input_image', image_url: base64 }
+          ]
+        }
+      ]
+    })
+  })
+  const data = await response.json()
+  if (data.output_text) return data.output_text
+  const textOutput = data.output?.find((item) => item.type === 'output_text')
+  return textOutput?.text || 'Image description unavailable'
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+async function handleImageChange(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  captionError.value = ''
+  isCaptioning.value = true
+  try {
+    const caption = await getCaption(file)
+    await saveImage(file, caption)
+    sendContextUpdate({ imageCaption: caption, source: 'image' })
+  } catch (error) {
+    captionError.value = error?.message || 'Failed to caption image'
+  } finally {
+    isCaptioning.value = false
+  }
+}
+
+const DB_NAME = 'partnerImages'
+const STORE_NAME = 'images'
+
+function openDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1)
+    request.onupgradeneeded = () => {
+      const db = request.result
+      if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME, { keyPath: 'id' })
+    }
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+}
+
+async function saveImage(file, caption) {
+  const db = await openDb()
+  const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  const record = { id, caption, createdAt: Date.now(), blob: file }
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite')
+    const store = tx.objectStore(STORE_NAME)
+    store.put(record)
+    tx.oncomplete = resolve
+    tx.onerror = () => reject(tx.error)
+  })
+  await loadImages()
+}
+
+async function loadImages() {
+  const db = await openDb()
+  const records = await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly')
+    const store = tx.objectStore(STORE_NAME)
+    const req = store.getAll()
+    req.onsuccess = () => resolve(req.result || [])
+    req.onerror = () => reject(req.error)
+  })
+  const sorted = records.sort((a, b) => b.createdAt - a.createdAt).slice(0, 5)
+  imageItems.value = sorted.map((item) => ({
+    id: item.id,
+    caption: item.caption,
+    createdAt: item.createdAt,
+    url: URL.createObjectURL(item.blob)
+  }))
+  await pruneImages(sorted.map((item) => item.id))
+}
+
+async function pruneImages(keepIds) {
+  const db = await openDb()
+  const records = await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly')
+    const store = tx.objectStore(STORE_NAME)
+    const req = store.getAllKeys()
+    req.onsuccess = () => resolve(req.result || [])
+    req.onerror = () => reject(req.error)
+  })
+  const toDelete = records.filter((id) => !keepIds.includes(id))
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite')
+    const store = tx.objectStore(STORE_NAME)
+    toDelete.forEach((id) => store.delete(id))
+    tx.oncomplete = resolve
+    tx.onerror = () => reject(tx.error)
+  })
 }
 
 onMounted(() => {
   initRecognition()
+  const storedHistory = localStorage.getItem('contextHistory')
+  if (storedHistory) {
+    try {
+      contextHistory.value = JSON.parse(storedHistory)
+    } catch {}
+  }
+  if (navigator.bluetooth) bleSupported.value = true
+  const storedBle = localStorage.getItem('bleDevices')
+  if (storedBle) {
+    try {
+      bleDevices.value = JSON.parse(storedBle)
+    } catch {}
+  }
+  loadImages()
   if (pairing.value && device.value) {
     connectRelay()
   }
@@ -332,16 +562,66 @@ onMounted(() => {
 
     <section v-if="isPaired" class="card">
       <h2>Context Update</h2>
-      <p>Send social graph or background context notes to OssiaVoice.</p>
+      <p>Send context notes, location, and image captions to OssiaVoice.</p>
+      <div class="chip-row">
+        <button v-for="label in quickLabels" :key="label" class="chip" @click="sendQuickLabel(label)">
+          {{ label }}
+        </button>
+      </div>
+      <div class="row">
+        <input v-model="contextLabel" class="input" placeholder="Location label (e.g. Living room)" />
+        <button :disabled="!isReady" class="pair-btn" @click="sendContextUpdate({ source: 'manual' })">
+          Send context
+        </button>
+      </div>
+      <div class="row">
+        <button :disabled="!isReady" class="pair-btn ghost" @click="sendGpsContext">Use GPS</button>
+        <span v-if="gpsStatus" class="small">{{ gpsStatus }}</span>
+        <span v-if="gpsError" class="error">{{ gpsError }}</span>
+      </div>
+      <div class="ble-block" v-if="bleSupported">
+        <div class="row">
+          <button class="pair-btn ghost" @click="addBleDevice(contextLabel || 'Living room')">
+            Tag BLE device
+          </button>
+          <span class="small">Tag a nearby device with the current label.</span>
+        </div>
+        <div class="ble-list" v-if="bleDevices.length">
+          <div v-for="device in bleDevices" :key="device.id" class="ble-item">
+            <div>
+              <strong>{{ device.label }}</strong>
+              <div class="small">{{ device.name }}</div>
+            </div>
+            <button class="pair-btn ghost" @click="sendBleContext(device)">Send</button>
+          </div>
+        </div>
+      </div>
       <textarea
         v-model="contextNotes"
         rows="3"
         class="input"
         placeholder="Context notes"
       ></textarea>
-      <button :disabled="!isReady" class="pair-btn" @click="sendContextUpdate">
-        Send context
-      </button>
+      <div class="row">
+        <label class="file-label">
+          Add photo
+          <input type="file" class="file-input" accept="image/*" capture="environment" @change="handleImageChange" />
+        </label>
+        <span v-if="isCaptioning" class="small">Captioning…</span>
+        <span v-if="captionError" class="error">{{ captionError }}</span>
+      </div>
+      <div v-if="imageItems.length" class="image-strip">
+        <div v-for="item in imageItems" :key="item.id" class="image-card">
+          <img :src="item.url" alt="context" />
+          <small>{{ item.caption }}</small>
+        </div>
+      </div>
+      <div v-if="contextHistory.length" class="history-strip">
+        <strong>Recent contexts</strong>
+        <button v-for="(item, index) in contextHistory" :key="index" class="history-pill" @click="resendContext(item)">
+          {{ item.label || item.timeOfDay }} · {{ item.weekday }}
+        </button>
+      </div>
     </section>
 
     <section v-if="isPaired" class="card">
@@ -497,6 +777,89 @@ onMounted(() => {
   width: 100%;
   max-height: 280px;
   display: block;
+}
+
+.file-input {
+  display: none;
+}
+
+.small {
+  font-size: 12px;
+  color: #666;
+}
+
+.image-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 10px;
+}
+
+.image-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid #e2ddd4;
+  border-radius: 10px;
+  padding: 6px;
+  background: #fff;
+}
+
+.image-card img {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.history-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-pill {
+  border: 1px solid #d6d0c7;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #f5f2ed;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  border: 1px solid #d6d0c7;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ble-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ble-list {
+  display: grid;
+  gap: 8px;
+}
+
+.ble-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #e2ddd4;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fff;
 }
 
 @media (max-width: 900px) {
