@@ -30,9 +30,17 @@ function submitInterlocutorMessage() {
       </v-btn>
     </div>
     <div id="partner-status">
-      <strong>Partners:</strong>
-      <span v-if="partnerStore.participants.length === 0">None connected</span>
-      <span v-else>{{ partnerStore.participants.map(p => p.displayName).join(', ') }}</span>
+      <div>
+        <strong>Partners:</strong>
+        <span v-if="partnerStore.participants.length === 0">None connected</span>
+        <span v-else>{{ partnerStore.participants.map(p => p.displayName).join(', ') }}</span>
+      </div>
+      <div v-if="partnerStore.latestContext()">
+        <strong>Context:</strong>
+        <span>
+          {{ partnerStore.latestContext().context?.label || partnerStore.latestContext().context?.timeOfDay }}
+        </span>
+      </div>
     </div>
     <micButton
       v-if="!settingStore.compactInterlocutorPanel"
