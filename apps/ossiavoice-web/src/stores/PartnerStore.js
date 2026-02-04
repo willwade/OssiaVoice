@@ -1,7 +1,8 @@
 import {ref, computed} from 'vue'
 import {defineStore} from 'pinia'
 
-const defaultRelayUrl = 'http://localhost:8787'
+const defaultRelayUrl =
+  import.meta.env.VITE_RELAY_BASE_URL || 'http://localhost:8787'
 
 function getStoredJson(key, fallback) {
   try {

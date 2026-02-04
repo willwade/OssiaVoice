@@ -1,30 +1,48 @@
 name: ossiavoice
-region: nyc
+region: lon
 
 services:
   - name: ws-relay
     environment_slug: node-js
-    source_dir: services/ws-relay
+    github:
+      repo: willwade/OssiaVoice
+      branch: main
+      deploy_on_push: true
+    source_dir: .
     build_command: npm install
-    run_command: npm run start
+    run_command: npm -w services/ws-relay run start
     http_port: 8787
+    routes:
+      - path: /relay
     envs:
       - key: NODE_ENV
         value: production
 
 static_sites:
   - name: ossiavoice-web
-    source_dir: apps/ossiavoice-web
-    build_command: npm install && npm run build
-    output_dir: dist
+    github:
+      repo: willwade/OssiaVoice
+      branch: main
+      deploy_on_push: true
+    source_dir: .
+    build_command: npm install && npm -w apps/ossiavoice-web run build
+    output_dir: apps/ossiavoice-web/dist
+    routes:
+      - path: /
     envs:
       - key: VITE_RELAY_BASE_URL
-        value: https://ws-relay-REPLACE_WITH_APP_PLATFORM_URL
+        value: https://ossian-ihhuf.ondigitalocean.app/relay
 
   - name: partner-web
-    source_dir: apps/partner-web
-    build_command: npm install && npm run build
-    output_dir: dist
+    github:
+      repo: willwade/OssiaVoice
+      branch: main
+      deploy_on_push: true
+    source_dir: .
+    build_command: npm install && npm -w apps/partner-web run build
+    output_dir: apps/partner-web/dist
+    routes:
+      - path: /partner
     envs:
       - key: VITE_RELAY_BASE_URL
-        value: https://ws-relay-REPLACE_WITH_APP_PLATFORM_URL
+        value: https://ossian-ihhuf.ondigitalocean.app/relay
