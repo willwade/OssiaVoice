@@ -75,7 +75,15 @@ watch(
 </script>
 
 <template>
-  <div id="interpreter-grid">
+  <div
+    id="interpreter-grid"
+    :class="[
+      `theme-${settingStore.appearanceTheme}`,
+      `font-${settingStore.fontScale.replace('.', '_')}`,
+      `top-${settingStore.topPanelEmphasis}`,
+      `bottom-${settingStore.bottomPanelEmphasis}`
+    ]"
+  >
     <v-overlay
         v-model="settingStore.showSettingsOverlay"
         class="align-center justify-center"
@@ -90,11 +98,16 @@ watch(
       <SettingsScreen/>
     </v-overlay>
     <div id="top-panel">
-      <div id="interlocutor-panel" :class="{ compact: settingStore.compactInterlocutorPanel }">
+      <div
+        id="interlocutor-panel"
+        :class="{ compact: settingStore.compactInterlocutorPanel }"
+        v-show="!settingStore.compactInterlocutorPanel || true"
+      >
         <InterlocutorPanel/>
       </div>
-      <div id="message-history">
-        <MessageHistory/>
+      <div id="message-history" :class="{ compact: settingStore.compactMessageHistory }">
+        <div v-if="settingStore.compactMessageHistory" class="compact-label">History (compact)</div>
+        <MessageHistory v-else/>
       </div>
     </div>
     <div id="bottom-panel">
@@ -103,12 +116,14 @@ watch(
           indeterminate rounded color="primary"
           id="progressLoading"/>
       <div id="message-panels">
-        <div id="message-builder" tabindex="0" class="tabbable">
-          <MessageBuilder/>
+        <div id="message-builder" tabindex="0" class="tabbable" :class="{ compact: settingStore.compactMessageBuilder }">
+          <div v-if="settingStore.compactMessageBuilder" class="compact-label">Builder (compact)</div>
+          <MessageBuilder v-else/>
         </div>
         <div id="separator"/>
-        <div id="message-options" tabindex="0" class="tabbable">
-          <MessageOptions/>
+        <div id="message-options" tabindex="0" class="tabbable" :class="{ compact: settingStore.compactMessageOptions }">
+          <div v-if="settingStore.compactMessageOptions" class="compact-label">Options (compact)</div>
+          <MessageOptions v-else/>
         </div>
       </div>
     </div>
@@ -178,6 +193,19 @@ watch(
   flex-grow: 1;
 }
 
+#message-history.compact,
+#message-builder.compact,
+#message-options.compact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.compact-label {
+  font-size: 12px;
+  color: theme.$text-color-inverted-muted;
+}
+
 #message-builder {
   background-color: theme.$ossia-light-background-1;
   height: 100%;
@@ -202,6 +230,59 @@ watch(
   overflow: auto;
   justify-items: stretch;
   background-color: theme.$ossia-light-background-1;
+}
+
+#interpreter-grid.theme-high-contrast {
+  background: #000;
+  color: #fff;
+}
+
+#interpreter-grid.theme-high-contrast #message-history,
+#interpreter-grid.theme-high-contrast #message-builder,
+#interpreter-grid.theme-high-contrast #message-options,
+#interpreter-grid.theme-high-contrast #interlocutor-panel {
+  background: #111;
+  color: #fff;
+}
+
+#interpreter-grid.font-1_15 {
+  font-size: 1.15em;
+}
+
+#interpreter-grid.font-1_3 {
+  font-size: 1.3em;
+}
+
+#interpreter-grid.top-interlocutor #interlocutor-panel {
+  width: 65%;
+}
+
+#interpreter-grid.top-interlocutor #message-history {
+  width: 35%;
+}
+
+#interpreter-grid.top-history #interlocutor-panel {
+  width: 35%;
+}
+
+#interpreter-grid.top-history #message-history {
+  width: 65%;
+}
+
+#interpreter-grid.bottom-builder #message-builder {
+  width: 65%;
+}
+
+#interpreter-grid.bottom-builder #message-options {
+  width: 35%;
+}
+
+#interpreter-grid.bottom-options #message-builder {
+  width: 35%;
+}
+
+#interpreter-grid.bottom-options #message-options {
+  width: 65%;
 }
 
 .settings-screen-overlay :deep(.v-overlay__content) {

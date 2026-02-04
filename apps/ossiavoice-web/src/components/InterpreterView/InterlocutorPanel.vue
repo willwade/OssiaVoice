@@ -34,7 +34,12 @@ function submitInterlocutorMessage() {
       <span v-if="partnerStore.participants.length === 0">None connected</span>
       <span v-else>{{ partnerStore.participants.map(p => p.displayName).join(', ') }}</span>
     </div>
-    <micButton id="mic-btn" v-model="messageStore.interlocutorPhrase" @textAvailable="submitInterlocutorMessage"/>
+    <micButton
+      v-if="!settingStore.compactInterlocutorPanel"
+      id="mic-btn"
+      v-model="messageStore.interlocutorPhrase"
+      @textAvailable="submitInterlocutorMessage"
+    />
     <div id="input-wrapper" v-if="!settingStore.compactInterlocutorPanel">
       <div id="message-input-wrapper">
         <v-text-field

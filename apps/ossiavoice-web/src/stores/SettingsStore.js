@@ -142,6 +142,19 @@ assistant:
   const compactInterlocutorPanel = ref(
     localStorage.getItem('compactInterlocutorPanel') === "true" || false
   )
+  const compactMessageHistory = ref(
+    localStorage.getItem('compactMessageHistory') === "true" || false
+  )
+  const compactMessageBuilder = ref(
+    localStorage.getItem('compactMessageBuilder') === "true" || false
+  )
+  const compactMessageOptions = ref(
+    localStorage.getItem('compactMessageOptions') === "true" || false
+  )
+  const topPanelEmphasis = ref(localStorage.getItem('topPanelEmphasis') || 'balanced')
+  const bottomPanelEmphasis = ref(localStorage.getItem('bottomPanelEmphasis') || 'balanced')
+  const appearanceTheme = ref(localStorage.getItem('appearanceTheme') || 'default')
+  const fontScale = ref(localStorage.getItem('fontScale') || '1')
 
   function save() {
     if (!(cookieAgreement.value && liabilityAgreement.value)) {
@@ -160,6 +173,13 @@ assistant:
     localStorage.setItem('ttsPitch', ttsPitch.value.toString())
     localStorage.setItem('ttsVolume', ttsVolume.value.toString())
     localStorage.setItem('compactInterlocutorPanel', compactInterlocutorPanel.value.toString())
+    localStorage.setItem('compactMessageHistory', compactMessageHistory.value.toString())
+    localStorage.setItem('compactMessageBuilder', compactMessageBuilder.value.toString())
+    localStorage.setItem('compactMessageOptions', compactMessageOptions.value.toString())
+    localStorage.setItem('topPanelEmphasis', topPanelEmphasis.value)
+    localStorage.setItem('bottomPanelEmphasis', bottomPanelEmphasis.value)
+    localStorage.setItem('appearanceTheme', appearanceTheme.value)
+    localStorage.setItem('fontScale', fontScale.value.toString())
     showSettingsWarning.value = false
     completeOnboarding()
     console.log('settings saved')
@@ -200,6 +220,13 @@ assistant:
     showOpenAIKey,
     showSettingsPanel,
     compactInterlocutorPanel,
+    compactMessageHistory,
+    compactMessageBuilder,
+    compactMessageOptions,
+    topPanelEmphasis,
+    bottomPanelEmphasis,
+    appearanceTheme,
+    fontScale,
     hasCompletedOnboarding,
     ttsEnabled,
     ttsVoice,
