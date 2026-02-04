@@ -30,6 +30,7 @@ export const usePartnerStore = defineStore('partner', () => {
   const pendingPairings = ref(getStoredJson('pendingPairings', []))
   const liveDrafts = ref({})
   const participantContext = ref(getStoredJson('partnerContext', {}))
+  const contextLog = ref(getStoredJson('partnerContextLog', []))
 
   const socketStatus = ref('disconnected')
   const lastError = ref('')
@@ -49,6 +50,7 @@ export const usePartnerStore = defineStore('partner', () => {
     localStorage.setItem('partnerDevices', JSON.stringify(devices.value))
     localStorage.setItem('pendingPairings', JSON.stringify(pendingPairings.value))
     localStorage.setItem('partnerContext', JSON.stringify(participantContext.value))
+    localStorage.setItem('partnerContextLog', JSON.stringify(contextLog.value))
   }
 
   async function ensureOwner() {
@@ -187,7 +189,28 @@ export const usePartnerStore = defineStore('partner', () => {
         ...patch
       }
     }
+    const entry = {
+      participantId,
+      timestamp: Date.now(),
+      ...patch
+    }
+    contextLog.value = [entry, ...contextLog.value].slice(0, 20)
     persist()
+  }
+
+  function addContextEvent(payload) {
+    const entry = {
+      participantId: payload.participantId,
+      timestamp: payload.timestamp || Date.now(),
+      context: payload.context || {},
+      source: payload.context?.source
+    }
+    contextLog.value = [entry, ...contextLog.value].slice(0, 50)
+    persist()
+  }
+
+  function latestContext() {
+    return contextLog.value[0] || null
   }
 
   function recordDevice(deviceInfo) {
@@ -293,6 +316,7 @@ export const usePartnerStore = defineStore('partner', () => {
     pendingPairings,
     liveDrafts,
     participantContext,
+    contextLog,
     socketStatus,
     lastError,
     wsUrl,
@@ -307,6 +331,8 @@ export const usePartnerStore = defineStore('partner', () => {
     getDisplayName,
     setLiveDraft,
     updateParticipantContext,
+    addContextEvent,
+    latestContext,
     recordDevice,
     revokeDevice,
     rotateDeviceSecret,

@@ -53,10 +53,14 @@ function handlePartnerMessage(payload) {
   }
 
   if (payload.type === 'context_update') {
-    partnerStore.updateParticipantContext(payload.participantId, {
-      relationships: payload.relationships,
-      notes: payload.notes
-    })
+    if (payload.context) {
+      partnerStore.addContextEvent(payload)
+    } else {
+      partnerStore.updateParticipantContext(payload.participantId, {
+        relationships: payload.relationships,
+        notes: payload.notes
+      })
+    }
   }
 }
 

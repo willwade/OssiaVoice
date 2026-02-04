@@ -37,6 +37,20 @@ senses pity.
 `)
 
   function getSystemMessage() {
+    const partnerContextRaw = localStorage.getItem('partnerContextLog')
+    let partnerContextText = ''
+    if (partnerContextRaw) {
+      try {
+        const entries = JSON.parse(partnerContextRaw)
+        if (entries?.length) {
+          const latest = entries[0]
+          const ctx = latest.context || latest
+          partnerContextText = `\\nLatest partner context: ${JSON.stringify(ctx)}`
+        }
+      } catch {
+        partnerContextText = ''
+      }
+    }
     return `
 You are an AI Bot for someone living with Motor Neurone Disease (MND) (hereafter referred to as the 'assistant'). You 
 receive a conversation between the assistant and another person (the 'user') . Your job 
@@ -55,6 +69,7 @@ Here are the rules for the generated suggestions:
 
 Here is the assistant's backstory:
 ${backstory.value}
+${partnerContextText}
 
 The format of the conversation will be a list of previous messages between 'user' and 'assistant', followed by an instruction. 
 The instruction could be to generate suggested sentences or a likely words list, or to modify previous suggestions for example.

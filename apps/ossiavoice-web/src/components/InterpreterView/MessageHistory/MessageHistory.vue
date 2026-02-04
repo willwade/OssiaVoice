@@ -1,5 +1,6 @@
 <script setup>
 import MessageBubble from "@/components/InterpreterView/MessageHistory/components/MessageBubble.vue";
+import PartnerContextBar from "@/components/InterpreterView/MessageHistory/PartnerContextBar.vue";
 import {useMessageStore} from "@/stores/MessageStore.js";
 
 const messageStore = useMessageStore()
@@ -8,6 +9,7 @@ const messageStore = useMessageStore()
 
 <template>
   <div id="messageWindow">
+    <PartnerContextBar/>
     <div v-if="Object.entries(messageStore.messageHistory).length === 0" id="placeholder">
       Message history will appear here
     </div>
