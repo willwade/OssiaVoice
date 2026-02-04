@@ -20,10 +20,13 @@ const isCaptioning = ref(false)
 const captionError = ref('')
 const gpsStatus = ref('')
 const gpsError = ref('')
+const isSecureContext = ref(!!window.isSecureContext)
 const bleSupported = ref(false)
 const bleDevices = ref([])
+const savedProfiles = ref([])
 const quickLabels = ['Living room', 'Bedroom', 'Kitchen', 'Garden']
 const accuracyThreshold = Number(import.meta.env.VITE_GPS_ACCURACY_METERS || 50)
+let gpsWatchId = null
 
 const storedPairing = localStorage.getItem('partnerPairing')
 const storedDevice = localStorage.getItem('partnerDevice')
@@ -48,6 +51,79 @@ const relayWsUrl = computed(() => {
 
 const isPaired = computed(() => !!pairing.value && !!device.value)
 const isReady = computed(() => !!device.value && connectionStatus.value === 'connected')
+const activeProfileId = computed(() => pairing.value?.sessionId || '')
+
+function loadProfiles() {
+  const raw = localStorage.getItem('partnerProfiles')
+  if (!raw) return
+  try {
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) savedProfiles.value = parsed
+  } catch {}
+}
+
+function persistProfiles(next) {
+  savedProfiles.value = next
+  localStorage.setItem('partnerProfiles', JSON.stringify(next))
+}
+
+function upsertProfile() {
+  if (!pairing.value) return
+  const id = pairing.value.sessionId
+  const name = pairing.value.participantName || participantName.value || 'AAC user'
+  const entry = {
+    id,
+    name,
+    relayBaseUrl: pairing.value.relayBaseUrl,
+    pairing: pairing.value,
+    device: device.value || null,
+    lastUsed: new Date().toISOString()
+  }
+  const next = [
+    entry,
+    ...savedProfiles.value.filter((profile) => profile.id !== id)
+  ].slice(0, 10)
+  persistProfiles(next)
+}
+
+function removeProfile(id) {
+  const next = savedProfiles.value.filter((profile) => profile.id !== id)
+  persistProfiles(next)
+}
+
+async function switchProfile(profile) {
+  if (!profile?.pairing) return
+  disconnectSocket()
+  pairing.value = profile.pairing
+  device.value = profile.device || null
+  pairingInput.value = ''
+  participantName.value = profile.name || ''
+  localStorage.setItem('partnerPairing', JSON.stringify(pairing.value))
+  if (device.value) {
+    localStorage.setItem('partnerDevice', JSON.stringify(device.value))
+  } else {
+    localStorage.removeItem('partnerDevice')
+  }
+  connectionStatus.value = 'connecting'
+  if (!device.value) {
+    try {
+      await enrollDevice()
+    } catch (error) {
+      errorMessage.value = error?.message || 'Enrollment failed'
+      connectionStatus.value = 'disconnected'
+      return
+    }
+  }
+  await connectRelay()
+  upsertProfile()
+}
+
+function disconnectSocket() {
+  if (socket && socket.readyState <= WebSocket.OPEN) {
+    socket.close()
+  }
+  socket = null
+}
 
 function initRecognition() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -112,10 +188,12 @@ async function applyPairing() {
     if (!payload?.relayBaseUrl || !payload?.enrollToken || !payload?.sessionId) {
       throw new Error('Invalid payload')
     }
+    if (participantName.value) payload.participantName = participantName.value
     pairing.value = payload
     localStorage.setItem('partnerPairing', JSON.stringify(payload))
     await enrollDevice()
     await connectRelay()
+    upsertProfile()
   } catch (error) {
     errorMessage.value = error?.message || 'Failed to apply pairing'
   }
@@ -151,6 +229,7 @@ function stopScan() {
 }
 
 function clearPairing() {
+  disconnectSocket()
   pairing.value = null
   device.value = null
   pairingInput.value = ''
@@ -172,6 +251,7 @@ async function enrollDevice() {
 
   device.value = await response.json()
   localStorage.setItem('partnerDevice', JSON.stringify(device.value))
+  upsertProfile()
 }
 
 async function connectRelay() {
@@ -298,8 +378,16 @@ function sendGpsContext() {
     gpsError.value = 'GPS not supported'
     return
   }
+  if (!window.isSecureContext) {
+    gpsError.value = 'GPS requires HTTPS (or localhost)'
+    return
+  }
   gpsStatus.value = 'Locating…'
   gpsError.value = ''
+  if (gpsWatchId !== null) {
+    navigator.geolocation.clearWatch(gpsWatchId)
+    gpsWatchId = null
+  }
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       const { latitude, longitude, accuracy } = pos.coords
@@ -315,20 +403,68 @@ function sendGpsContext() {
       }
     },
     (err) => {
-      gpsError.value = err.message || 'GPS failed'
+      if (err?.code === 3) {
+        gpsStatus.value = 'Waiting for GPS fix…'
+        const watchTimeout = window.setTimeout(() => {
+          if (gpsWatchId !== null) {
+            navigator.geolocation.clearWatch(gpsWatchId)
+            gpsWatchId = null
+          }
+          gpsError.value = 'GPS timed out — try again or move near a window'
+          gpsStatus.value = ''
+        }, 20000)
+        gpsWatchId = navigator.geolocation.watchPosition(
+          (pos) => {
+            window.clearTimeout(watchTimeout)
+            const { latitude, longitude, accuracy } = pos.coords
+            gpsStatus.value = `Accuracy ~${Math.round(accuracy)}m`
+            const context = {
+              source: 'gps',
+              coords: { lat: latitude, lon: longitude, accuracy }
+            }
+            if (accuracy <= accuracyThreshold) {
+              sendContextUpdate(context)
+            } else {
+              sendContextUpdate({ ...context, warning: 'low_accuracy' })
+            }
+            navigator.geolocation.clearWatch(gpsWatchId)
+            gpsWatchId = null
+          },
+          (watchErr) => {
+            window.clearTimeout(watchTimeout)
+            gpsError.value = watchErr?.message || 'GPS failed'
+            gpsStatus.value = ''
+            if (gpsWatchId !== null) {
+              navigator.geolocation.clearWatch(gpsWatchId)
+              gpsWatchId = null
+            }
+          },
+          { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        )
+        return
+      }
+      gpsError.value = err?.message || 'GPS failed'
       gpsStatus.value = ''
     },
-    { enableHighAccuracy: true, timeout: 10000 }
+    { enableHighAccuracy: false, timeout: 60000, maximumAge: 60000 }
   )
 }
 
 async function addBleDevice(label) {
   if (!navigator.bluetooth) return
-  const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true })
-  const entry = { id: device.id, name: device.name || 'Unknown', label }
-  const next = [entry, ...bleDevices.value.filter((d) => d.id !== device.id)].slice(0, 10)
-  bleDevices.value = next
-  localStorage.setItem('bleDevices', JSON.stringify(next))
+  try {
+    if (!window.isSecureContext) {
+      captionError.value = 'BLE requires HTTPS (or localhost)'
+      return
+    }
+    const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true })
+    const entry = { id: device.id, name: device.name || 'Unknown', label }
+    const next = [entry, ...bleDevices.value.filter((d) => d.id !== device.id)].slice(0, 10)
+    bleDevices.value = next
+    localStorage.setItem('bleDevices', JSON.stringify(next))
+  } catch (error) {
+    captionError.value = error?.message || 'BLE scan cancelled'
+  }
 }
 
 function sendBleContext(device) {
@@ -460,6 +596,7 @@ async function pruneImages(keepIds) {
 
 onMounted(() => {
   initRecognition()
+  loadProfiles()
   const storedHistory = localStorage.getItem('contextHistory')
   if (storedHistory) {
     try {
@@ -467,6 +604,7 @@ onMounted(() => {
     } catch {}
   }
   if (navigator.bluetooth) bleSupported.value = true
+  if (!window.isSecureContext) isSecureContext.value = false
   const storedBle = localStorage.getItem('bleDevices')
   if (storedBle) {
     try {
@@ -489,7 +627,7 @@ onMounted(() => {
       </div>
     </header>
 
-    <section class="card">
+    <section class="card" v-if="!isPaired">
       <h2>Pairing</h2>
       <p>Paste the pairing payload from OssiaVoice or scan a QR.</p>
       <textarea
@@ -501,9 +639,6 @@ onMounted(() => {
       <div class="row">
         <button class="pair-btn" @click="scanActive ? stopScan() : startScan()">
           {{ scanActive ? 'Stop scanner' : 'Scan QR' }}
-        </button>
-        <button v-if="isPaired" class="pair-btn ghost" @click="clearPairing">
-          Clear pairing
         </button>
         <span v-if="scanError" class="error">{{ scanError }}</span>
       </div>
@@ -523,6 +658,69 @@ onMounted(() => {
         <strong>Status:</strong>
         <span>{{ connectionStatus }}</span>
       </div>
+    </section>
+
+    <section class="card" v-else>
+      <h2>Connected</h2>
+      <p>Pairing is active. You can switch or clear it below.</p>
+      <div class="row">
+        <div class="input read-only">
+          <strong>{{ pairing?.participantName || 'AAC user' }}</strong>
+          <div class="small">{{ pairing?.relayBaseUrl }}</div>
+        </div>
+        <button class="secondary" @click="clearPairing">Disconnect</button>
+      </div>
+      <div class="profiles">
+        <strong>Saved profiles</strong>
+        <p v-if="!savedProfiles.length" class="small">No saved profiles yet.</p>
+        <div v-else class="profile-list">
+          <div
+            v-for="profile in savedProfiles"
+            :key="profile.id"
+            class="profile-item"
+            :class="{ active: profile.id === activeProfileId }"
+          >
+            <div>
+              <div class="profile-name">{{ profile.name || 'AAC user' }}</div>
+              <div class="small">{{ profile.relayBaseUrl }}</div>
+              <div class="small">Last used: {{ new Date(profile.lastUsed).toLocaleString() }}</div>
+            </div>
+            <div class="profile-actions">
+              <button class="pair-btn ghost" @click="switchProfile(profile)">Switch</button>
+              <button class="secondary" @click="removeProfile(profile.id)">Remove</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <details class="pairing-details">
+        <summary>Pair with another AAC user</summary>
+        <p>Paste the pairing payload from another OssiaVoice instance or scan a QR.</p>
+        <textarea
+          v-model="pairingInput"
+          rows="4"
+          class="input"
+          placeholder="Pairing payload"
+        ></textarea>
+        <div class="row">
+          <button class="pair-btn" @click="applyPairing" :disabled="!pairingInput.trim()">
+            Pair device
+          </button>
+          <button class="pair-btn ghost" @click="scanActive ? stopScan() : startScan()">
+            {{ scanActive ? 'Stop scanner' : 'Scan QR' }}
+          </button>
+          <span v-if="scanError" class="error">{{ scanError }}</span>
+        </div>
+        <div v-if="scanActive" class="scanner">
+          <video ref="videoRef" class="scanner-video"></video>
+        </div>
+        <div class="row">
+          <input
+            v-model="participantName"
+            class="input"
+            placeholder="Display name (optional)"
+          />
+        </div>
+      </details>
     </section>
 
     <section v-if="isPaired" class="card">
@@ -578,13 +776,15 @@ onMounted(() => {
         <button :disabled="!isReady" class="pair-btn ghost" @click="sendGpsContext">Use GPS</button>
         <span v-if="gpsStatus" class="small">{{ gpsStatus }}</span>
         <span v-if="gpsError" class="error">{{ gpsError }}</span>
+        <span v-if="!isSecureContext" class="error">Requires HTTPS (or localhost)</span>
       </div>
       <div class="ble-block" v-if="bleSupported">
+        <div v-if="!isSecureContext" class="error">BLE requires HTTPS (or localhost).</div>
         <div class="row">
           <button class="pair-btn ghost" @click="addBleDevice(contextLabel || 'Living room')">
-            Tag BLE device
+            Scan & tag BLE
           </button>
-          <span class="small">Tag a nearby device with the current label.</span>
+          <span class="small">Chrome will show a device picker.</span>
         </div>
         <div class="ble-list" v-if="bleDevices.length">
           <div v-for="device in bleDevices" :key="device.id" class="ble-item">
@@ -700,6 +900,13 @@ onMounted(() => {
   font-size: 14px;
   font-family: inherit;
 }
+.input.read-only {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #f5f5f5;
+  border-style: dashed;
+}
 
 .input:focus {
   outline: 2px solid rgba(84, 62, 35, 0.2);
@@ -721,6 +928,44 @@ onMounted(() => {
   background: transparent;
   border: 1px solid #bdb3a7;
   color: #1b1a17;
+}
+.pairing-details {
+  margin-top: 12px;
+}
+.pairing-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.profiles {
+  display: grid;
+  gap: 8px;
+}
+.profile-list {
+  display: grid;
+  gap: 10px;
+}
+.profile-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #ddd2c7;
+  background: #faf7f2;
+}
+.profile-item.active {
+  border-color: #1b1a17;
+  box-shadow: 0 0 0 2px rgba(27, 26, 23, 0.1);
+}
+.profile-name {
+  font-weight: 600;
+}
+.profile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
 }
 .pair-btn:disabled {
   opacity: 0.6;
