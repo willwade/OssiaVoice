@@ -2,6 +2,7 @@
 import BuildSentence from "@/components/InterpreterView/MessageBuilder/tabs/BuildSentence.vue";
 import EditSentence from "@/components/InterpreterView/MessageBuilder/tabs/EditSentence.vue";
 import NewSentence from "@/components/InterpreterView/MessageBuilder/tabs/NewSentence.vue";
+import WordGrid from "@/components/InterpreterView/MessageBuilder/tabs/WordGrid.vue";
 import {useMessageStore} from "@/stores/MessageStore.js";
 
 const messageStore = useMessageStore()
@@ -21,6 +22,9 @@ const messageStore = useMessageStore()
         <v-tab value="new">
           <v-icon size="30" icon="mdi-comment-plus-outline"/>
         </v-tab>
+        <v-tab value="grid">
+          <v-icon size="30" icon="mdi-grid"/>
+        </v-tab>
       </v-tabs>
     </div>
 
@@ -29,6 +33,7 @@ const messageStore = useMessageStore()
         <BuildSentence v-if="messageStore.messageTab === 'build'"/>
         <EditSentence v-else-if="messageStore.messageTab === 'edit'"/>
         <NewSentence v-else-if="messageStore.messageTab === 'new'"/>
+        <WordGrid v-else-if="messageStore.messageTab === 'grid'"/>
       </div>
     </div>
 

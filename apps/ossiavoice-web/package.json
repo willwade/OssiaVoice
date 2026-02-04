@@ -15,9 +15,14 @@
   },
   "dependencies": {
     "@ossia/shared": "*",
+    "aac-board-viewer": "^0.2.9",
     "openai": "^4.28.0",
     "pinia": "^2.1.7",
     "qrcode": "^1.5.4",
+    "stream-browserify": "^3.0.0",
+    "events": "^3.3.0",
+    "sql.js": "^1.13.0",
+    "timers-browserify": "^2.0.12",
     "vue": "^3.4.15",
     "vue-router": "^4.2.5",
     "vuetify": "^3.5.3"

@@ -9,9 +9,18 @@ export default defineConfig({
     vue(),
   ],
   base: '/',
+  define: {
+    global: 'globalThis'
+  },
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      stream: 'stream-browserify',
+      events: 'events',
+      timers: 'timers-browserify',
+      'aac-board-viewer/vue': fileURLToPath(
+        new URL('../../node_modules/aac-board-viewer/dist/vue/index.mjs', import.meta.url)
+      )
     }
   }
 })
