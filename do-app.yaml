@@ -1,0 +1,30 @@
+name: ossiavoice
+region: nyc
+
+services:
+  - name: ws-relay
+    environment_slug: node-js
+    source_dir: services/ws-relay
+    build_command: npm install
+    run_command: npm run start
+    http_port: 8787
+    envs:
+      - key: NODE_ENV
+        value: production
+
+static_sites:
+  - name: ossiavoice-web
+    source_dir: apps/ossiavoice-web
+    build_command: npm install && npm run build
+    output_dir: dist
+    envs:
+      - key: VITE_RELAY_BASE_URL
+        value: https://ws-relay-REPLACE_WITH_APP_PLATFORM_URL
+
+  - name: partner-web
+    source_dir: apps/partner-web
+    build_command: npm install && npm run build
+    output_dir: dist
+    envs:
+      - key: VITE_RELAY_BASE_URL
+        value: https://ws-relay-REPLACE_WITH_APP_PLATFORM_URL
