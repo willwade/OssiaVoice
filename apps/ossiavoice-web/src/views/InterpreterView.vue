@@ -4,6 +4,7 @@ import MessageHistory from "@/components/InterpreterView/MessageHistory/MessageH
 import MessageBuilder from "@/components/InterpreterView/MessageBuilder/MessageBuilder.vue";
 import MessageOptions from "@/components/InterpreterView/MessageOptions.vue";
 import SettingsOverlay from "@/components/InterpreterView/SettingsOverlay.vue";
+import SettingsScreen from "@/components/InterpreterView/SettingsScreen.vue";
 import {useLoadingStore} from "@/stores/LoadingStore.js";
 import {useSettingsStore} from "@/stores/SettingsStore.js";
 import {usePartnerStore} from "@/stores/PartnerStore.js";
@@ -80,6 +81,13 @@ watch(
         class="align-center justify-center"
     >
       <settings-overlay @close="settingStore.showSettingsOverlay=false"/>
+    </v-overlay>
+    <v-overlay
+        v-model="settingStore.showSettingsPanel"
+        class="settings-screen-overlay"
+        scrim="#11111199"
+    >
+      <SettingsScreen/>
     </v-overlay>
     <div id="top-panel">
       <div id="interlocutor-panel">
@@ -188,6 +196,12 @@ watch(
   overflow: auto;
   justify-items: stretch;
   background-color: theme.$ossia-light-background-1;
+}
+
+.settings-screen-overlay :deep(.v-overlay__content) {
+  width: 95vw;
+  height: 90vh;
+  max-width: 1400px;
 }
 
 @media (max-width: 600px) {

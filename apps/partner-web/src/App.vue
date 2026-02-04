@@ -35,6 +35,7 @@ const relayWsUrl = computed(() => {
   return pairing.value.relayBaseUrl.replace(/^http/, 'ws') + '/ws'
 })
 
+const isPaired = computed(() => !!pairing.value && !!device.value)
 const isReady = computed(() => !!device.value && connectionStatus.value === 'connected')
 
 function initRecognition() {
@@ -136,6 +137,15 @@ async function startScan() {
 function stopScan() {
   if (codeReader) codeReader.reset()
   scanActive.value = false
+}
+
+function clearPairing() {
+  pairing.value = null
+  device.value = null
+  pairingInput.value = ''
+  localStorage.removeItem('partnerPairing')
+  localStorage.removeItem('partnerDevice')
+  connectionStatus.value = 'disconnected'
 }
 
 async function enrollDevice() {
@@ -243,17 +253,15 @@ onMounted(() => {
 <template>
   <main class="page">
     <header class="hero">
-      <p class="eyebrow">Ossia Partner</p>
-      <h1>Push-to-talk transcription for multi-participant sessions.</h1>
-      <p class="lede">
-        Pair this device with OssiaVoice, hold to talk, and stream transcripts with
-        participant context.
-      </p>
+      <div class="app-title">Ossia Partner</div>
+      <div class="status-pill" :class="isPaired ? 'ok' : 'idle'">
+        {{ isPaired ? 'Paired' : 'Not paired' }}
+      </div>
     </header>
 
     <section class="card">
       <h2>Pairing</h2>
-      <p>Paste the pairing payload from OssiaVoice.</p>
+      <p>Paste the pairing payload from OssiaVoice or scan a QR.</p>
       <textarea
         v-model="pairingInput"
         rows="4"
@@ -263,6 +271,9 @@ onMounted(() => {
       <div class="row">
         <button class="pair-btn" @click="scanActive ? stopScan() : startScan()">
           {{ scanActive ? 'Stop scanner' : 'Scan QR' }}
+        </button>
+        <button v-if="isPaired" class="pair-btn ghost" @click="clearPairing">
+          Clear pairing
         </button>
         <span v-if="scanError" class="error">{{ scanError }}</span>
       </div>
@@ -284,7 +295,7 @@ onMounted(() => {
       </div>
     </section>
 
-    <section class="card">
+    <section v-if="isPaired" class="card">
       <h2>Push to Talk</h2>
       <p v-if="!sttAvailable" class="error">
         Speech recognition is not available in this browser. Use manual input instead.
@@ -308,7 +319,7 @@ onMounted(() => {
       </div>
     </section>
 
-    <section class="card">
+    <section v-if="isPaired" class="card">
       <h2>Manual Send</h2>
       <p>Use this fallback if speech recognition is unavailable.</p>
       <div class="row">
@@ -319,7 +330,7 @@ onMounted(() => {
       </div>
     </section>
 
-    <section class="card">
+    <section v-if="isPaired" class="card">
       <h2>Context Update</h2>
       <p>Send social graph or background context notes to OssiaVoice.</p>
       <textarea
@@ -333,7 +344,7 @@ onMounted(() => {
       </button>
     </section>
 
-    <section class="card">
+    <section v-if="isPaired" class="card">
       <h2>BLE Proximity (Chrome Desktop)</h2>
       <p>
         BLE context hints will be enabled only when supported by the browser. Safari
@@ -352,7 +363,7 @@ onMounted(() => {
 
 .page {
   min-height: 100vh;
-  padding: 56px clamp(24px, 5vw, 72px);
+  padding: 20px 16px 80px;
   font-family: 'Inter', system-ui, sans-serif;
   background: radial-gradient(circle at top, #f4efe7, #f8f6f2 55%, #f1f4f8 100%);
   color: #1b1a17;
@@ -361,27 +372,28 @@ onMounted(() => {
 }
 
 .hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   max-width: 720px;
 }
 
-.eyebrow {
-  text-transform: uppercase;
+.app-title {
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.status-pill {
+  padding: 6px 12px;
+  border-radius: 999px;
   font-size: 12px;
-  letter-spacing: 0.2em;
-  font-weight: 600;
-  color: #6b5b42;
-}
-
-h1 {
-  font-family: 'DM Serif Display', serif;
-  font-size: clamp(32px, 5vw, 56px);
-  margin: 12px 0;
-}
-
-.lede {
-  font-size: 18px;
-  line-height: 1.6;
+  background: #e8e3da;
   color: #3a332a;
+}
+
+.status-pill.ok {
+  background: #d9f2e3;
+  color: #20623b;
 }
 
 .card {
@@ -425,6 +437,11 @@ h1 {
   cursor: pointer;
 }
 
+.pair-btn.ghost {
+  background: transparent;
+  border: 1px solid #bdb3a7;
+  color: #1b1a17;
+}
 .pair-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -486,6 +503,12 @@ h1 {
   .row {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
   }
 }
 </style>

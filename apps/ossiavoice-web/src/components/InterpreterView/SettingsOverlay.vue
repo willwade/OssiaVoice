@@ -1,7 +1,7 @@
 <script setup>
 import {useSettingsStore} from "@/stores/SettingsStore.js";
 import {usePartnerStore} from "@/stores/PartnerStore.js";
-import SettingsForm from "@/components/InterpreterView/SettingsForm.vue";
+import SettingsKeyConsent from "@/components/InterpreterView/SettingsKeyConsent.vue";
 import {onMounted, ref} from "vue";
 
 const settingsStore = useSettingsStore()
@@ -69,7 +69,7 @@ onMounted(() => {
             Ossia Voice - Getting Started
           </v-chip>
         </div>
-        <SettingsForm/>
+        <SettingsKeyConsent/>
         <h2 class="title">Contact & About</h2>
         <div class="group-content">
           Ossia was developed by James Arney as a concept for interacting using AI, for those who need it

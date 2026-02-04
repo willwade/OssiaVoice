@@ -9,6 +9,7 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 const qrDataUrl = ref('')
 const activePayload = ref(null)
+const showQr = ref(false)
 
 const latestPairing = computed(() => partnerStore.pendingPairings[0] || null)
 
@@ -28,7 +29,9 @@ watch(
   latestPairing,
   async (pairing) => {
     activePayload.value = pairing?.payload || null
-    await generateQr(pairing?.payload)
+    if (showQr.value) {
+      await generateQr(pairing?.payload)
+    }
   },
   { immediate: true }
 )
@@ -40,6 +43,7 @@ async function createPairing() {
     const payload = await partnerStore.issueEnrollToken(participantName.value)
     participantName.value = ''
     activePayload.value = payload
+    showQr.value = true
     await generateQr(payload)
   } catch (error) {
     errorMessage.value = error?.message || 'Failed to create pairing'
@@ -51,6 +55,18 @@ async function createPairing() {
 function copyPayload() {
   if (!activePayload.value) return
   navigator.clipboard?.writeText(JSON.stringify(activePayload.value))
+}
+
+function clearPairings() {
+  partnerStore.clearAllPairings()
+  showQr.value = false
+  activePayload.value = null
+  qrDataUrl.value = ''
+}
+
+function resetParticipants() {
+  partnerStore.clearParticipantsAndDevices()
+  clearPairings()
 }
 </script>
 
@@ -106,7 +122,7 @@ function copyPayload() {
       <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
     </div>
 
-    <div v-if="activePayload" class="section">
+    <div v-if="activePayload && showQr" class="section">
       <h3>Pairing QR</h3>
       <p class="hint">
         Scan this code with the partner app, or copy the payload below.
@@ -117,6 +133,13 @@ function copyPayload() {
           <pre>{{ JSON.stringify(activePayload, null, 2) }}</pre>
           <v-btn size="small" variant="text" @click="copyPayload">Copy payload</v-btn>
         </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="row">
+        <v-btn size="small" variant="text" @click="clearPairings">Clear pending QR</v-btn>
+        <v-btn size="small" variant="text" @click="resetParticipants">Reset participants</v-btn>
       </div>
     </div>
 

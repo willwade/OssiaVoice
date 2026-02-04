@@ -1,6 +1,5 @@
 <script setup>
 import MicButton from "@/components/reusable/MicButton.vue";
-import SettingsPanel from "@/components/InterpreterView/SettingsPanel.vue";
 import {useMessageStore} from "@/stores/MessageStore.js";
 import {useSettingsStore} from "@/stores/SettingsStore.js";
 
@@ -24,9 +23,6 @@ function submitInterlocutorMessage() {
       <v-btn @click.stop="settingStore.showSettingsPanel = !settingStore.showSettingsPanel" color="transparent" flat size="20" icon="mdi-cog">
         <v-icon color="grey"></v-icon>
       </v-btn>
-    </div>
-    <div id="settings-panel" v-if="settingStore.showSettingsPanel">
-      <SettingsPanel/>
     </div>
     <micButton id="mic-btn" v-model="messageStore.interlocutorPhrase" @textAvailable="submitInterlocutorMessage"/>
     <div id="input-wrapper">
@@ -86,12 +82,6 @@ function submitInterlocutorMessage() {
   width: fit-content;
 }
 
-#settings-panel {
-  width: 100%;
-  max-height: 45%;
-  overflow: auto;
-  margin-top: 40px;
-}
 
 #mic-btn {
   display: flex;

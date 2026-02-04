@@ -40,5 +40,6 @@ const settingsStore = useSettingsStore()
 
 .panel-body {
   overflow: auto;
+  max-height: calc(100% - 40px);
 }
 </style>
