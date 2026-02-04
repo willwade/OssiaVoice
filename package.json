@@ -12,6 +12,13 @@
     "build:ossia": "npm -w apps/ossiavoice-web run build",
     "test:ossia": "npm -w apps/ossiavoice-web run test:unit",
     "dev:partner": "npm -w apps/partner-web run dev",
-    "dev:relay": "npm -w services/ws-relay run dev"
+    "dev:relay": "npm -w services/ws-relay run dev",
+    "dev:all": "concurrently -k -n ossia,partner,relay -c green,cyan,magenta \"npm run dev:ossia\" \"npm run dev:partner\" \"npm run dev:relay\"",
+    "lint:all": "npm -w apps/ossiavoice-web run lint && npm -w apps/partner-web run lint && npm -w services/ws-relay run lint",
+    "test:all": "npm -w apps/ossiavoice-web run test:unit && npm -w apps/partner-web run test && npm -w services/ws-relay run test",
+    "build:all": "npm -w apps/ossiavoice-web run build && npm -w apps/partner-web run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   }
 }

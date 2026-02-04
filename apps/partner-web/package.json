@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --ignore-path ../../.gitignore",
+    "test": "echo \"No tests\""
   },
   "dependencies": {
     "@ossia/shared": "*",
