@@ -140,6 +140,7 @@ function resetParticipants() {
       <div class="row">
         <v-btn size="small" variant="text" @click="clearPairings">Clear pending QR</v-btn>
         <v-btn size="small" variant="text" @click="resetParticipants">Reset participants</v-btn>
+        <v-btn size="small" variant="text" @click="partnerStore.resetOwner()">Re-register owner</v-btn>
       </div>
     </div>
 

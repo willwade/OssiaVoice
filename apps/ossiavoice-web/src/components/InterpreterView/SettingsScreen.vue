@@ -5,6 +5,7 @@ import SettingsKeyConsent from '@/components/InterpreterView/SettingsKeyConsent.
 import SettingsTts from '@/components/InterpreterView/SettingsTts.vue'
 import SettingsPartner from '@/components/InterpreterView/SettingsPartner.vue'
 import SettingsHistory from '@/components/InterpreterView/SettingsHistory.vue'
+import SettingsLayout from '@/components/InterpreterView/SettingsLayout.vue'
 
 const settingsStore = useSettingsStore()
 const tab = ref('key')
@@ -13,7 +14,8 @@ const tabItems = [
   { title: 'Key & Consent', value: 'key' },
   { title: 'TTS', value: 'tts' },
   { title: 'Partner', value: 'partner' },
-  { title: 'History', value: 'history' }
+  { title: 'History', value: 'history' },
+  { title: 'Layout', value: 'layout' }
 ]
 
 const isSmall = computed(() => window.innerWidth < 700)
@@ -61,6 +63,9 @@ const isSmall = computed(() => window.innerWidth < 700)
       </div>
       <div v-show="tab === 'history'">
         <SettingsHistory />
+      </div>
+      <div v-show="tab === 'layout'">
+        <SettingsLayout />
       </div>
     </div>
   </div>

@@ -139,6 +139,9 @@ assistant:
   const ttsRate = ref(Number(localStorage.getItem('ttsRate') || 1))
   const ttsPitch = ref(Number(localStorage.getItem('ttsPitch') || 1))
   const ttsVolume = ref(Number(localStorage.getItem('ttsVolume') || 1))
+  const compactInterlocutorPanel = ref(
+    localStorage.getItem('compactInterlocutorPanel') === "true" || false
+  )
 
   function save() {
     if (!(cookieAgreement.value && liabilityAgreement.value)) {
@@ -156,6 +159,7 @@ assistant:
     localStorage.setItem('ttsRate', ttsRate.value.toString())
     localStorage.setItem('ttsPitch', ttsPitch.value.toString())
     localStorage.setItem('ttsVolume', ttsVolume.value.toString())
+    localStorage.setItem('compactInterlocutorPanel', compactInterlocutorPanel.value.toString())
     showSettingsWarning.value = false
     completeOnboarding()
     console.log('settings saved')
@@ -195,6 +199,7 @@ assistant:
     backstory,
     showOpenAIKey,
     showSettingsPanel,
+    compactInterlocutorPanel,
     hasCompletedOnboarding,
     ttsEnabled,
     ttsVoice,

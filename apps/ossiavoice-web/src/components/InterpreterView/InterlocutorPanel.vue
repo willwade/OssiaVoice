@@ -2,9 +2,11 @@
 import MicButton from "@/components/reusable/MicButton.vue";
 import {useMessageStore} from "@/stores/MessageStore.js";
 import {useSettingsStore} from "@/stores/SettingsStore.js";
+import {usePartnerStore} from "@/stores/PartnerStore.js";
 
 const messageStore = useMessageStore()
 const settingStore = useSettingsStore()
+const partnerStore = usePartnerStore()
 
 function submitInterlocutorMessage() {
   if (messageStore.interlocutorPhrase !== '') {
@@ -23,9 +25,17 @@ function submitInterlocutorMessage() {
       <v-btn @click.stop="settingStore.showSettingsPanel = !settingStore.showSettingsPanel" color="transparent" flat size="20" icon="mdi-cog">
         <v-icon color="grey"></v-icon>
       </v-btn>
+      <v-btn @click.stop="settingStore.compactInterlocutorPanel = !settingStore.compactInterlocutorPanel" color="transparent" flat size="20" icon="mdi-arrow-collapse-horizontal">
+        <v-icon color="grey"></v-icon>
+      </v-btn>
+    </div>
+    <div id="partner-status">
+      <strong>Partners:</strong>
+      <span v-if="partnerStore.participants.length === 0">None connected</span>
+      <span v-else>{{ partnerStore.participants.map(p => p.displayName).join(', ') }}</span>
     </div>
     <micButton id="mic-btn" v-model="messageStore.interlocutorPhrase" @textAvailable="submitInterlocutorMessage"/>
-    <div id="input-wrapper">
+    <div id="input-wrapper" v-if="!settingStore.compactInterlocutorPanel">
       <div id="message-input-wrapper">
         <v-text-field
             placeholder="Message"
@@ -80,6 +90,13 @@ function submitInterlocutorMessage() {
   gap: 10px;
   position: absolute;
   width: fit-content;
+}
+
+#partner-status {
+  margin-top: 10px;
+  font-size: 12px;
+  color: theme.$text-color-inverted-muted;
+  text-align: center;
 }
 
 

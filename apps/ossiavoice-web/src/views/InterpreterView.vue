@@ -90,7 +90,7 @@ watch(
       <SettingsScreen/>
     </v-overlay>
     <div id="top-panel">
-      <div id="interlocutor-panel">
+      <div id="interlocutor-panel" :class="{ compact: settingStore.compactInterlocutorPanel }">
         <InterlocutorPanel/>
       </div>
       <div id="message-history">
@@ -164,6 +164,12 @@ watch(
   width: 50%;
   min-width: 300px;
   max-width: 550px;
+}
+
+#interlocutor-panel.compact {
+  width: 260px;
+  min-width: 200px;
+  max-width: 260px;
 }
 
 #message-history {

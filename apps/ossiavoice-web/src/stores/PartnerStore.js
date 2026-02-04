@@ -62,6 +62,12 @@ export const usePartnerStore = defineStore('partner', () => {
     persist()
   }
 
+  function resetOwner() {
+    ownerId.value = ''
+    ownerSecret.value = ''
+    persist()
+  }
+
   function createSession() {
     sessionId.value = uuid()
     persist()
@@ -84,6 +90,11 @@ export const usePartnerStore = defineStore('partner', () => {
     })
 
     if (!response.ok) {
+      if (response.status === 401) {
+        resetOwner()
+        await ensureOwner()
+        return issueEnrollToken(displayName)
+      }
       const errorText = await response.text()
       throw new Error(errorText || 'enroll_issue_failed')
     }
@@ -285,6 +296,7 @@ export const usePartnerStore = defineStore('partner', () => {
     lastError,
     wsUrl,
     ensureOwner,
+    resetOwner,
     createSession,
     issueEnrollToken,
     clearPairing,
