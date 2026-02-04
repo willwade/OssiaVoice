@@ -10,6 +10,7 @@ const errorMessage = ref('')
 const qrDataUrl = ref('')
 const activePayload = ref(null)
 const showQr = ref(false)
+const zoomQr = ref(false)
 
 const latestPairing = computed(() => partnerStore.pendingPairings[0] || null)
 
@@ -67,6 +68,10 @@ function clearPairings() {
 function resetParticipants() {
   partnerStore.clearParticipantsAndDevices()
   clearPairings()
+}
+
+function toggleZoom() {
+  zoomQr.value = !zoomQr.value
 }
 </script>
 
@@ -128,12 +133,22 @@ function resetParticipants() {
         Scan this code with the partner app, or copy the payload below.
       </p>
       <div class="qr-row">
-        <img v-if="qrDataUrl" :src="qrDataUrl" alt="Pairing QR" />
+        <img
+          v-if="qrDataUrl"
+          :src="qrDataUrl"
+          alt="Pairing QR"
+          class="qr-image"
+          @click="toggleZoom"
+        />
         <div class="payload">
           <pre>{{ JSON.stringify(activePayload, null, 2) }}</pre>
           <v-btn size="small" variant="text" @click="copyPayload">Copy payload</v-btn>
         </div>
       </div>
+    </div>
+
+    <div v-if="zoomQr && qrDataUrl" class="qr-overlay" @click="toggleZoom">
+      <img :src="qrDataUrl" alt="Pairing QR enlarged" />
     </div>
 
     <div class="section">
@@ -218,6 +233,34 @@ function resetParticipants() {
   grid-template-columns: 240px 1fr;
   gap: 16px;
   align-items: start;
+}
+
+.qr-image {
+  width: 140px;
+  height: 140px;
+  cursor: zoom-in;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+}
+
+.qr-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.qr-overlay img {
+  width: 320px;
+  height: 320px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px;
+  cursor: zoom-out;
 }
 
 .payload {
