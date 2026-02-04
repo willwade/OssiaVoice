@@ -3,9 +3,13 @@ import {defineStore} from 'pinia'
 
 export const useSettingsStore = defineStore('settings', () => {
 
-  const openAIAPIKey = ref(localStorage.getItem('openAIAPIKey') || '')
-  const context = ref(localStorage.getItem('context') || '')
-  const backstory = ref(localStorage.getItem('backstory') || '')
+  const envOpenAIKey = import.meta.env.VITE_OPENAI_API_KEY
+  const envBackstory = import.meta.env.VITE_OSSIA_BACKSTORY
+  const envContext = import.meta.env.VITE_OSSIA_CONTEXT
+
+  const openAIAPIKey = ref(localStorage.getItem('openAIAPIKey') || envOpenAIKey || '')
+  const context = ref(localStorage.getItem('context') || envContext || '')
+  const backstory = ref(localStorage.getItem('backstory') || envBackstory || '')
 
   const exampleContext = ref(
     `Time: 20:37
@@ -122,9 +126,19 @@ assistant:
 `
   }
 
-  const liabilityAgreement = ref(localStorage.getItem('liabilityAgreement') === "true" || false)
+  const liabilityAgreement = ref(
+    localStorage.getItem('liabilityAgreement') === "true" || !!envOpenAIKey || false
+  )
 
-  const cookieAgreement = ref(localStorage.getItem('cookieAgreement') === "true" || false)
+  const cookieAgreement = ref(
+    localStorage.getItem('cookieAgreement') === "true" || !!envOpenAIKey || false
+  )
+
+  const ttsEnabled = ref(localStorage.getItem('ttsEnabled') === "true" || true)
+  const ttsVoice = ref(localStorage.getItem('ttsVoice') || '')
+  const ttsRate = ref(Number(localStorage.getItem('ttsRate') || 1))
+  const ttsPitch = ref(Number(localStorage.getItem('ttsPitch') || 1))
+  const ttsVolume = ref(Number(localStorage.getItem('ttsVolume') || 1))
 
   function save() {
     if (!(cookieAgreement.value && liabilityAgreement.value)) {
@@ -137,7 +151,13 @@ assistant:
     localStorage.setItem('backstory', backstory.value)
     localStorage.setItem('liabilityAgreement', liabilityAgreement.value.toString())
     localStorage.setItem('cookieAgreement', cookieAgreement.value.toString())
+    localStorage.setItem('ttsEnabled', ttsEnabled.value.toString())
+    localStorage.setItem('ttsVoice', ttsVoice.value)
+    localStorage.setItem('ttsRate', ttsRate.value.toString())
+    localStorage.setItem('ttsPitch', ttsPitch.value.toString())
+    localStorage.setItem('ttsVolume', ttsVolume.value.toString())
     showSettingsWarning.value = false
+    completeOnboarding()
     console.log('settings saved')
   }
 
@@ -150,8 +170,22 @@ assistant:
     localStorage.setItem('context', newContext)
   })
 
-  const showSettingsOverlay = ref(!(liabilityAgreement.value && cookieAgreement.value))
+  const showOpenAIKey = ref(false)
+  const showSettingsPanel = ref(false)
+  const hasCompletedOnboarding = ref(
+    localStorage.getItem('hasCompletedOnboarding') === "true" || false
+  )
+
+  const showSettingsOverlay = ref(
+    !!envOpenAIKey ? false : !hasCompletedOnboarding.value
+  )
   const showSettingsWarning = ref(false)
+
+  function completeOnboarding() {
+    hasCompletedOnboarding.value = true
+    localStorage.setItem('hasCompletedOnboarding', 'true')
+    showSettingsOverlay.value = false
+  }
 
   return {
     showSettingsOverlay,
@@ -159,11 +193,20 @@ assistant:
     openAIAPIKey,
     context,
     backstory,
+    showOpenAIKey,
+    showSettingsPanel,
+    hasCompletedOnboarding,
+    ttsEnabled,
+    ttsVoice,
+    ttsRate,
+    ttsPitch,
+    ttsVolume,
     exampleContext,
     exampleBackstory,
     getSystemMessage,
     liabilityAgreement,
     cookieAgreement,
     save,
+    completeOnboarding
   }
 })

@@ -125,6 +125,19 @@ export const usePartnerStore = defineStore('partner', () => {
     persist()
   }
 
+  function clearAllPairings() {
+    pendingPairings.value = []
+    persist()
+  }
+
+  function clearParticipantsAndDevices() {
+    participants.value = []
+    devices.value = []
+    participantContext.value = {}
+    liveDrafts.value = {}
+    persist()
+  }
+
   function upsertParticipant(participantId, patch) {
     const index = participants.value.findIndex(
       (participant) => participant.participantId === participantId
@@ -275,6 +288,8 @@ export const usePartnerStore = defineStore('partner', () => {
     createSession,
     issueEnrollToken,
     clearPairing,
+    clearAllPairings,
+    clearParticipantsAndDevices,
     upsertParticipant,
     getDisplayName,
     setLiveDraft,

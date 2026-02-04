@@ -1,16 +1,13 @@
 <script setup>
 import {useSettingsStore} from "@/stores/SettingsStore.js";
 import {usePartnerStore} from "@/stores/PartnerStore.js";
-import PartnerPairing from "@/components/InterpreterView/PartnerPairing.vue";
-import PartnerContext from "@/components/InterpreterView/PartnerContext.vue";
+import SettingsForm from "@/components/InterpreterView/SettingsForm.vue";
 import {onMounted, ref} from "vue";
 
 const settingsStore = useSettingsStore()
 const partnerStore = usePartnerStore()
 
 const emit = defineEmits(['close'])
-const showOpenAIKey = ref(false)
-
 const isChrome = ref(true)
 const isDesktop = ref(true)
 
@@ -72,52 +69,7 @@ onMounted(() => {
             Ossia Voice - Getting Started
           </v-chip>
         </div>
-        <h2 class="title">Settings</h2>
-        <div class="group-content">
-          <h3 class="subheading"><span style="color: red">*</span> OpenAI API Key</h3>
-          <span>
-        Ossia is built on top of ChatGPT. You need an OpenAI account to use Ossia, as you would if you were using ChatGPT
-        normally. Visit their website <a href="https://platform.openai.com/api-keys">here</a> to generate a personal account key.
-            We suggest also setting spending limits to control your spend with OpenAI.
-        </span>
-          <div id="api-key-input-wrapper">
-            <v-text-field id="api-key-input"
-                          :append-inner-icon="showOpenAIKey ? 'mdi-eye' : 'mdi-eye-off'"
-                          @click:append-inner="showOpenAIKey = !showOpenAIKey"
-                          :type="showOpenAIKey ? 'text' : 'password'"
-                          v-model="settingsStore.openAIAPIKey"
-                          label="Do not share this key. E.g. sf-lx3l5DaIyg..."/>
-            <strong id="important">Important!</strong> You will be charged for each request Ossia makes to ChatGPT -
-            do not share your key with anyone! (We cannot and do not store your key - see the video for details)
-          </div>
-        </div>
-        <div class="group-content">
-          <h3 class="subheading"><span style="color: red">*</span> User Backstory</h3>
-          Describe the user in as much detail as possible. e.g. name, hobbies, political leaning, temperament, family
-          and close friends etc.
-          <span id="example-link"
-                @click="settingsStore.backstory = settingsStore.exampleBackstory">Or use an example</span>
-          <div id="backstory-input-wrapper">
-            <v-textarea id="backstory-input" label="user backstory" v-model="settingsStore.backstory" hide-details/>
-          </div>
-        </div>
-        <div class="group-content">
-          <h3 class="subheading"><span style="color: red">*</span> Terms & Conditions and Cookies </h3>
-          <v-checkbox v-model="settingsStore.liabilityAgreement" label="I agree that by using this software in beta I am doing so
-         entirely at my own risk. This website is intended entirely for testing, as a proof of concept, and I
-         therefore do not hold Ossia, or anyone who has contributed to Ossia individually liable for any repercussions
-         of its use. I agree that the data I enter to this site can be shared with OpenAI through ChatGPT prompts."/>
-          <v-checkbox v-model="settingsStore.cookieAgreement" label="We use cookies and local storage purely to aid your experience; by
-         saving your settings and data locally to your device, we have no need to collect any personal data
-         ourselves. By ticking this box I accept the use of cookies and local storage."/>
-        </div>
-        <h2 class="title">Partner Devices</h2>
-        <div class="group-content">
-          <PartnerPairing/>
-        </div>
-        <div class="group-content">
-          <PartnerContext/>
-        </div>
+        <SettingsForm/>
         <h2 class="title">Contact & About</h2>
         <div class="group-content">
           Ossia was developed by James Arney as a concept for interacting using AI, for those who need it
@@ -149,7 +101,7 @@ onMounted(() => {
       <div id="bottom-buttons">
         <v-btn
             id="complete-later-btn"
-            @click="emit('close')">
+            @click="settingsStore.completeOnboarding(); emit('close')">
           Complete later
         </v-btn>
         <v-btn
@@ -292,6 +244,12 @@ a {
   padding: 10px 0;
 }
 
+.slider-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
 #bottom-buttons {
   display: flex;
   justify-content: end;
@@ -343,6 +301,10 @@ a {
   #video-embed {
     height: 36vw;
     width: 65vw;
+  }
+
+  .slider-row {
+    grid-template-columns: 1fr;
   }
 }
 
