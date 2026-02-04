@@ -12,11 +12,19 @@ module.exports = {
     {
       files: [
         'cypress/e2e/**/*.{cy,spec}.{js,ts,jsx,tsx}',
-        'cypress/support/**/*.{js,ts,jsx,tsx}'
+        'cypress/support/**/*.{js,ts,jsx,tsx}',
+        'apps/ossiavoice-web/cypress/e2e/**/*.{cy,spec}.{js,ts,jsx,tsx}',
+        'apps/ossiavoice-web/cypress/support/**/*.{js,ts,jsx,tsx}'
       ],
       'extends': [
         'plugin:cypress/recommended'
       ]
+    },
+    {
+      files: ['services/ws-relay/**/*.{js,mjs,cjs}'],
+      env: {
+        node: true
+      }
     }
   ],
   parserOptions: {

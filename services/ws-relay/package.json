@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "node src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "lint": "eslint . --ext .js,.mjs,.cjs --ignore-path ../../.gitignore",
+    "test": "echo \"No tests\""
   },
   "dependencies": {
     "express": "^4.19.2",
